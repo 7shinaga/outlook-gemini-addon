@@ -3,6 +3,7 @@ Office.onReady((info) => {
         document.getElementById("generateBtn").onclick = handleGenerate;
         document.getElementById("saveKeyBtn").onclick = saveApiKey;
 
+        // 保存済みAPIキーがあれば入力欄に反映
         const savedKey = localStorage.getItem("GEMINI_API_KEY");
         if (savedKey) {
             document.getElementById("apiKeyInput").value = savedKey;
@@ -54,14 +55,21 @@ ${points}
 【受信メール】
 ${emailBody}`;
 
-        // 混雑を避けるため、優先度の高いモデル順に試行するリスト
-        const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
-        let replyText = null;
-        let lastError = null;
+        // 無料枠で最も負荷が低く混雑回避しやすい軽量モデルを優先順に指定
+        const candidateModels = [
+            "gemini-2.5-flash-lite",
+            "gemini-1.5-flash-8b",
+            "gemini-2.0-flash-lite",
+            "gemini-1.5-flash"
+        ];
 
-        for (const model of models) {
+        let replyText = null;
+        let lastErrorMsg = "";
+
+        for (const model of candidateModels) {
             try {
                 status.innerText = `返信文を生成中... (${model})`;
+                
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -73,25 +81,26 @@ ${emailBody}`;
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error ? data.error.message : "APIエラー");
+                    const errMsg = data.error ? data.error.message : "APIエラー";
+                    throw new Error(`[${model}] ${errMsg}`);
                 }
 
-                if (data.candidates && data.candidates.length > 0) {
+                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts.length > 0) {
                     replyText = data.candidates[0].content.parts[0].text;
-                    break; // 成功したらループを抜ける
+                    break; // 生成成功したらループ終了
                 }
             } catch (err) {
-                lastError = err;
-                console.warn(`${model} で失敗、次のモデルを試します:`, err);
+                lastErrorMsg = err.message;
+                console.warn(err);
             }
         }
 
         if (!replyText) {
-            status.innerText = "生成エラー: " + (lastError ? lastError.message : "モデルが混雑しています。少し待ってお試しください。");
+            status.innerText = "生成エラー:\n" + lastErrorMsg;
             return;
         }
 
-        // Outlookの作成画面に本文を挿入
+        // Outlookのメール本文に直接挿入
         Office.context.mailbox.item.body.setSelectedDataAsync(
             replyText,
             { coercionType: Office.CoercionType.Text },
