@@ -3,7 +3,6 @@ Office.onReady((info) => {
         document.getElementById("generateBtn").onclick = handleGenerate;
         document.getElementById("saveKeyBtn").onclick = saveApiKey;
 
-        // 保存済みキーがあれば反映
         const savedKey = localStorage.getItem("GEMINI_API_KEY");
         if (savedKey) {
             document.getElementById("apiKeyInput").value = savedKey;
@@ -34,11 +33,11 @@ async function handleGenerate() {
         return;
     }
 
-    status.innerText = "メール本文を読み取り、返信文を生成中...";
+    status.innerText = "メール本文を読み取り、AIが返信文を作成中...";
 
     Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, async (result) => {
         if (result.status === Office.AsyncResultStatus.Failed) {
-            status.innerText = "メール本文の取得に失敗しました。";
+            status.innerText = "エラー: メール本文の取得に失敗しました。";
             return;
         }
 
@@ -55,36 +54,54 @@ ${points}
 【受信メール】
 ${emailBody}`;
 
-        try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
-            });
+        // 混雑を避けるため、優先度の高いモデル順に試行するリスト
+        const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
+        let replyText = null;
+        let lastError = null;
 
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error ? errData.error.message : "APIリクエスト失敗");
-            }
+        for (const model of models) {
+            try {
+                status.innerText = `返信文を生成中... (${model})`;
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
 
-            const data = await response.json();
-            const replyText = data.candidates[0].content.parts[0].text;
+                const data = await response.json();
 
-            Office.context.mailbox.item.body.setSelectedDataAsync(
-                replyText,
-                { coercionType: Office.CoercionType.Text },
-                (asyncResult) => {
-                    if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-                        status.innerText = "返信文をメール本文に挿入しました！";
-                    } else {
-                        status.innerText = "本文への挿入に失敗しました。";
-                    }
+                if (!response.ok) {
+                    throw new Error(data.error ? data.error.message : "APIエラー");
                 }
-            );
-        } catch (error) {
-            status.innerText = "エラー: " + error.message;
+
+                if (data.candidates && data.candidates.length > 0) {
+                    replyText = data.candidates[0].content.parts[0].text;
+                    break; // 成功したらループを抜ける
+                }
+            } catch (err) {
+                lastError = err;
+                console.warn(`${model} で失敗、次のモデルを試します:`, err);
+            }
         }
+
+        if (!replyText) {
+            status.innerText = "生成エラー: " + (lastError ? lastError.message : "モデルが混雑しています。少し待ってお試しください。");
+            return;
+        }
+
+        // Outlookの作成画面に本文を挿入
+        Office.context.mailbox.item.body.setSelectedDataAsync(
+            replyText,
+            { coercionType: Office.CoercionType.Text },
+            (asyncResult) => {
+                if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+                    status.innerText = "返信文をメール本文に挿入しました！";
+                } else {
+                    status.innerText = "本文への挿入に失敗しました: " + asyncResult.error.message;
+                }
+            }
+        );
     });
 }
