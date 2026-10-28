@@ -5,78 +5,47 @@
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI返信アシスタント</title>
-    <!-- Office JavaScript API -->
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <style>
         body {
-            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Hiragino Sans", "Meiryo", sans-serif;
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
             padding: 16px;
             margin: 0;
             background-color: #f8f9fa;
             color: #333;
         }
-        h3 {
-            margin-top: 0;
-            margin-bottom: 8px;
-            font-size: 15px;
-            font-weight: 600;
-        }
-        .desc {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 12px;
-            line-height: 1.4;
-        }
+        h3 { margin-top: 0; margin-bottom: 8px; font-size: 15px; }
+        .desc { font-size: 12px; color: #666; margin-bottom: 12px; line-height: 1.4; }
         textarea {
-            width: 100%;
-            box-sizing: border-box;
-            height: 140px;
-            padding: 10px;
-            font-size: 13px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            resize: vertical;
-            line-height: 1.5;
-        }
-        textarea:focus {
-            outline: none;
-            border-color: #0078d4;
-            box-shadow: 0 0 0 1px #0078d4;
+            width: 100%; box-sizing: border-box; height: 120px; padding: 8px;
+            font-size: 13px; border: 1px solid #ccc; border-radius: 4px;
         }
         button {
-            width: 100%;
-            margin-top: 12px;
-            padding: 10px;
-            background-color: #0078d4;
-            color: #ffffff;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: background-color 0.2s;
+            width: 100%; margin-top: 10px; padding: 10px; background-color: #0078d4;
+            color: #ffffff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600;
         }
-        button:hover {
-            background-color: #005a9e;
-        }
-        #status {
-            margin-top: 12px;
-            font-size: 12px;
-            line-height: 1.4;
-            color: #444;
-            white-space: pre-wrap;
-        }
+        button:hover { background-color: #005a9e; }
+        #status { margin-top: 10px; font-size: 12px; color: #444; white-space: pre-wrap; }
+        .settings-area { margin-top: 20px; padding-top: 12px; border-top: 1px solid #ddd; }
+        .settings-area summary { font-size: 12px; color: #666; cursor: pointer; }
+        .settings-area input { width: 100%; box-sizing: border-box; padding: 6px; font-size: 12px; margin-top: 6px; }
     </style>
 </head>
 <body>
     <h3>返信に盛り込む要点</h3>
     <div class="desc">
         受信メールは自動で取得されます。<br>
-        反映させたい要点だけを箇条書きで入力してください。
+        反映させたい要点を箇条書きで入力してください。
     </div>
-    <textarea id="userPoints" placeholder="例：&#13;&#10;・来週火曜日の15時以降なら可能&#13;&#10;・事前にアジェンダと資料を送付してほしい旨&#13;&#10;・オンライン（Teams）希望"></textarea>
+    <textarea id="userPoints" placeholder="例：&#13;&#10;・来週火曜の15時以降なら可能&#13;&#10;・事前に資料を送付してほしい旨"></textarea>
     <button id="generateBtn">返信文を生成して挿入</button>
     <div id="status"></div>
+
+    <details class="settings-area">
+        <summary>⚙ APIキー設定（初回のみ）</summary>
+        <input type="password" id="apiKeyInput" placeholder="AIzaSy..." />
+        <button id="saveKeyBtn" style="background-color: #666; font-size: 12px; padding: 6px; margin-top: 6px;">APIキーを保存</button>
+    </details>
 
     <script src="taskpane.js"></script>
 </body>
