@@ -1,16 +1,34 @@
-// 1行目のクォーテーションの中に、先ほど取得したAPIキーを貼り付けてください
-const GEMINI_API_KEY = "AQ.Ab8RN6IpSjka4sqf_gwFyDPzpjK3gGpfy1a974Fua6xhTcKUzg";
-
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         document.getElementById("generateBtn").onclick = handleGenerate;
+        document.getElementById("saveKeyBtn").onclick = saveApiKey;
+
+        // 保存済みキーがあれば反映
+        const savedKey = localStorage.getItem("GEMINI_API_KEY");
+        if (savedKey) {
+            document.getElementById("apiKeyInput").value = savedKey;
+        }
     }
 });
+
+function saveApiKey() {
+    const key = document.getElementById("apiKeyInput").value.trim();
+    if (key) {
+        localStorage.setItem("GEMINI_API_KEY", key);
+        document.getElementById("status").innerText = "APIキーを端末に安全に保存しました！";
+    }
+}
 
 async function handleGenerate() {
     const status = document.getElementById("status");
     const points = document.getElementById("userPoints").value.trim();
+    const apiKey = localStorage.getItem("GEMINI_API_KEY") || document.getElementById("apiKeyInput").value.trim();
     
+    if (!apiKey) {
+        status.innerText = "下の「⚙ APIキー設定」からAPIキーを保存してください。";
+        return;
+    }
+
     if (!points) {
         status.innerText = "盛り込む要点を入力してください。";
         return;
@@ -18,7 +36,6 @@ async function handleGenerate() {
 
     status.innerText = "メール本文を読み取り、返信文を生成中...";
 
-    // 返信元（受信メール）の本文を取得
     Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, async (result) => {
         if (result.status === Office.AsyncResultStatus.Failed) {
             status.innerText = "メール本文の取得に失敗しました。";
@@ -27,7 +44,6 @@ async function handleGenerate() {
 
         const emailBody = result.value;
 
-        // Gemini APIへ送るプロンプト
         const prompt = `あなたはビジネスメール作成のエキスパートです。
 以下の【受信メール】に対する返信メールの本文を作成してください。
 【盛り込みたい要点】を過不足なく反映し、丁寧で自然なビジネス敬語を用いてください。
@@ -40,7 +56,7 @@ ${points}
 ${emailBody}`;
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -56,7 +72,6 @@ ${emailBody}`;
             const data = await response.json();
             const replyText = data.candidates[0].content.parts[0].text;
 
-            // 作成中のメール本文に返信文を挿入
             Office.context.mailbox.item.body.setSelectedDataAsync(
                 replyText,
                 { coercionType: Office.CoercionType.Text },
